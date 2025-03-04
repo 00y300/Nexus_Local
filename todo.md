@@ -1,7 +1,7 @@
 # Nexus Local Programming To-Do List
 
 ## Setup and Environment
-- [ ] **Initialize Project Repository**
+- [x] **Initialize Project Repository**
   - Create a GitHub repository and set up version control.
   - Define branch strategy and commit conventions.
 - [/] **Configure Development Environment**
