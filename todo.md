@@ -15,15 +15,16 @@
   - Configure a local development server 
   - Set up environment variables for configuration.
 - [ ] **Database Configuration**
-  - Install and configure MySQL locally.
-  - Design the database schema including tables for users, products, orders, and messages.
-  - Connect the server application to the MySQL database (consider using an ORM like Sequelize).
+  - [ ] - Figure out how to share an online database.
+      - [ ] * Install and configure MySQL locally as last resort.
+  - [ ] Design the database schema including tables for users, products, orders, and messages.
+  - [ ] Connect the server application to the MySQL database (consider using an ORM like Sequelize).
 
 ## Front-End Development
 - [ ] **UI/UX Development**
   - Build responsive layouts using React and Tailwind CSS.
   - Create reusable components for forms, buttons, modals, and alerts.
-- [ ] **User Authentication **
+- [ ] **User Authentication**
   - Develop registration and login pages.
   - Implement role-based access control (vendor vs. buyer).
 - [ ] **Vendor Dashboard**
@@ -33,10 +34,6 @@
   - Implement product browsing with search and filtering features.
   - Develop shopping cart and secure checkout pages.
   - Integrate user profile management.
-- [ ] **Messaging System**
-  - Build a real-time messaging feature for vendor-customer communication.
-  - Create UI components for chat functionality.
-
 ## Back-End Development
 - [ ] **API Development**
   - Set up RESTful endpoints using NextJS.js (or your chosen framework) for:
