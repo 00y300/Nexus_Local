@@ -4,7 +4,7 @@
 - [ ] **Initialize Project Repository**
   - Create a GitHub repository and set up version control.
   - Define branch strategy and commit conventions.
-- [ ] **Configure Development Environment**
+- [/] **Configure Development Environment**
   - Install Node.js (or your chosen runtime) and npm.
   - Initialize a React project (e.g., using Create React App or Vite).
   - Integrate Tailwind CSS for styling.
