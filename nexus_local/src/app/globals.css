@@ -1,3 +1,2 @@
-/* import "tailwindcss/preflight" */
-/* @tailwind utilities; */
+/* The way to setup the the tailwindcss for the entire project. */
 @import "tailwindcss";
