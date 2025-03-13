@@ -1,3 +1,4 @@
+import "../app/globals.css";
 import NavigationBar from "@/components/navigationBar";
 
 export default function MyApp({ Component, pageProps }) {
