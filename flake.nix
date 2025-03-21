@@ -39,9 +39,6 @@
             delve
             gopls
             go-outline
-            atac
-            # golangci-lint
-
             tree
           ];
 
