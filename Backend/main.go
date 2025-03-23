@@ -35,7 +35,9 @@ func main() {
 	}
 
 	// Define the scopes for your Azure app.
-	allScopes := []string{"User.Read.All"}
+	// allScopes := []string{"User.Read.All"}
+
+	allScopes := []string{"offline_access", "User.Read.All"}
 	log.Printf("Using scopes: %v", allScopes)
 
 	// Construct the OAuth 2.0 endpoints using the tenant ID.

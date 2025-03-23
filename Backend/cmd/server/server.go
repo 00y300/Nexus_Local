@@ -8,7 +8,6 @@ import (
 	"nexus.local/internal/auth"
 )
 
-// defaultHandler: an example route at /hello/
 func defaultHandler(w http.ResponseWriter, r *http.Request) {
 	msg := fmt.Sprintf("Hi there, I love %s!", r.URL.Path[len("/hello/"):])
 	w.Write([]byte(msg))
