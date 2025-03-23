@@ -12,7 +12,6 @@ import (
 
 	"github.com/joho/godotenv"
 	"golang.org/x/oauth2"
-	// Replace with your actual module paths
 )
 
 func main() {

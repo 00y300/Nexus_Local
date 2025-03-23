@@ -12,7 +12,7 @@ Nexus Local is a digital marketplace designed to connect local growers and small
 - **Front-End:** React, Tailwind CSS
 - **Back-End:** Node.js
 - **Database:** MySQL
-- **Authentication:** ; _____
+- **Authentication:** [OAuth 2.0 w/ Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/architecture/auth-oauth2)
 
 ## Installation
 
