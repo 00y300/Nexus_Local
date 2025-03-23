@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Microsoft OAuth Example</title>
+</head>
+<body>
+    <h1>Requesting User.Read.All</h1>
+    
+    <p>
+        This app only requests the <strong>User.Read.All</strong> permission.
+        An admin must consent to this permission in Azure AD.
+    </p>
+
+    <h2>Login URL</h2>
+    <p>
+        <a href="{{.LoginURL}}">{{.LoginURL}}</a>
+    </p>
+    
+    <h2>Redirect URL</h2>
+    <p>{{.RedirectURL}}</p>
+    
+    <h2>Actions</h2>
+    <p>
+        <!-- Direct link to initiate the login flow -->
+        <a href="/login">Login with Microsoft</a>
+    </p>
+</body>
+</html>

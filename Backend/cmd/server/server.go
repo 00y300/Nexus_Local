@@ -1,19 +1,22 @@
 package server
 
 import (
-	"flag"
+	"fmt"
 	"log"
 	"net/http"
+
+	"nexus.local/internal/auth"
 )
 
+// defaultHandler: an example route at /hello/
 func defaultHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Hi there, I love " + r.URL.Path[1:] + "!"))
+	msg := fmt.Sprintf("Hi there, I love %s!", r.URL.Path[len("/hello/"):])
+	w.Write([]byte(msg))
 }
 
 // corsMiddleware sets the CORS headers for each request.
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Allow all origins and specific methods/headers.
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
@@ -26,22 +29,24 @@ func corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// StartServer initializes and starts the HTTP server.
-func StartServer() {
-	port := flag.String("port", "8000", "Port to run the HTTP server on")
-	flag.Parse()
-
+// StartServer initializes and starts the HTTP server on port 8080.
+func StartServer(app *auth.App) {
 	mux := http.NewServeMux()
 
-	// Register route handlers.
-	mux.HandleFunc("/", defaultHandler)
+	// Register your default route at /hello
+	mux.HandleFunc("/hello/", defaultHandler)
 
-	// Apply CORS middleware.
+	// Register OAuth routes:
+	mux.HandleFunc("/", app.Root)
+	mux.HandleFunc("/login", app.Login)
+	mux.HandleFunc("/redirect", app.OAuthCallback)
+
+	// Wrap everything with the CORS middleware.
 	handlerWithCORS := corsMiddleware(mux)
-	addr := ":" + *port
+
+	addr := ":8080"
 	log.Printf("Starting server on %s", addr)
 
-	// Start listening and serving requests.
 	if err := http.ListenAndServe(addr, handlerWithCORS); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}

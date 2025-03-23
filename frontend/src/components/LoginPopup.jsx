@@ -1,4 +1,5 @@
 import Image from "next/image";
+
 const LoginPopup = ({ onClose }) => {
   return (
     <div
@@ -40,26 +41,6 @@ const LoginPopup = ({ onClose }) => {
             </div>
 
             <div className="mt-7 flex flex-col gap-2">
-              <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded border border-slate-300 bg-white p-2 text-sm font-medium text-black focus:ring-2 focus:ring-[#333] focus:ring-offset-1">
-                <Image
-                  src="https://www.svgrepo.com/show/512317/github-142.svg"
-                  alt="GitHub"
-                  width={500}
-                  height={500}
-                  className="h-[18px] w-[18px]"
-                />
-                Continue with GitHub
-              </button>
-              <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded border border-slate-300 bg-white p-2 text-sm font-medium text-black focus:ring-2 focus:ring-[#333] focus:ring-offset-1">
-                <Image
-                  src="https://www.svgrepo.com/show/475656/google-color.svg"
-                  alt="Google"
-                  className="h-[18px] w-[18px]"
-                  width={500}
-                  height={500}
-                />
-                Continue with Google
-              </button>
               <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded border border-slate-300 bg-white p-2 text-sm font-medium text-black focus:ring-2 focus:ring-[#333] focus:ring-offset-1">
                 <Image
                   src="https://www.svgrepo.com/show/448234/linkedin.svg"
