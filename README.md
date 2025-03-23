@@ -9,8 +9,8 @@ Nexus Local is a digital marketplace designed to connect local growers and small
 - **Customer Interface:** Search and filter products by area code, with a streamlined shopping cart and secure checkout.
 
 ## Tech Stack
-- **Front-End:** React, Tailwind CSS
-- **Back-End:** Node.js
+- **Front-End:** React, Tailwind CSS, NextJS
+- **Back-End:** Golang
 - **Database:** MySQL
 - **Authentication:** [OAuth 2.0 w/ Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/architecture/auth-oauth2)
 
@@ -18,5 +18,6 @@ Nexus Local is a digital marketplace designed to connect local growers and small
 
 ### Prerequisites
 - Node.js (v14 or higher)
+- Golang
 - MySQL Server
 - Git
