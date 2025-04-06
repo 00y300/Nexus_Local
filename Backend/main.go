@@ -35,8 +35,6 @@ func main() {
 	}
 
 	// Define the scopes for your Azure app.
-	// allScopes := []string{"User.Read.All"}
-
 	allScopes := []string{"offline_access", "User.Read.All"}
 	log.Printf("Using scopes: %v", allScopes)
 
@@ -62,9 +60,14 @@ func main() {
 			ParseFiles("index.html"),
 	)
 
-	// Create our OAuth "App" which holds the config and template.
+	// Create our OAuth "App" with its configuration and template.
 	oauthApp := auth.NewApp(oauthCfg, tmpl)
 
-	// Start the HTTP server on port 8080, injecting the OAuth app for routes.
-	server.StartServer(oauthApp)
+	// Create a new server instance using dependency injection.
+	srv := server.NewServer(oauthApp)
+
+	// Start the server on port 8080.
+	if err := srv.Start(":8080"); err != nil {
+		log.Fatalf("Server failed: %v", err)
+	}
 }

@@ -11,11 +11,13 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// PageData holds the data passed to the HTML template.
 type PageData struct {
 	LoginURL    string
 	RedirectURL string
 }
 
+// App holds the OAuth configuration and the HTML template.
 type App struct {
 	OAuthCfg *oauth2.Config
 	Tmpl     *template.Template
@@ -85,9 +87,7 @@ func (a *App) OAuthCallback(w http.ResponseWriter, r *http.Request) {
 		log.Printf("No ID Token returned.")
 	}
 
-	//-----------------------------------------------------------------
 	// 1. Create a new request to the Microsoft Graph /me endpoint.
-	//-----------------------------------------------------------------
 	req, err := http.NewRequest("GET", "https://graph.microsoft.com/v1.0/me", nil)
 	if err != nil {
 		http.Error(w, "Failed to create Graph request: "+err.Error(), http.StatusInternalServerError)
@@ -112,7 +112,7 @@ func (a *App) OAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 5. Decode the JSON response into a map (or custom struct).
+	// 5. Decode the JSON response into a map.
 	var userData map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&userData); err != nil {
 		http.Error(w, "Failed to decode JSON: "+err.Error(), http.StatusInternalServerError)
