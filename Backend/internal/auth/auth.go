@@ -55,8 +55,7 @@ func (a *App) Login(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, url, http.StatusFound)
 }
 
-// OAuthCallback handler: processes the authorization code from Microsoft,
-// exchanges it for an access token, and then calls Microsoft Graph /me.
+// OAuthCallback handler: processes the authorization code from Microsoft.
 func (a *App) OAuthCallback(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
 	if code == "" {
@@ -65,14 +64,12 @@ func (a *App) OAuthCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("Received code: %s", code)
 
-	// Exchange the authorization code for a token.
 	token, err := a.OAuthCfg.Exchange(context.Background(), code)
 	if err != nil {
 		http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Log refresh and access tokens (for debugging/demo).
 	if token.RefreshToken != "" {
 		log.Printf("Refresh Token: %s", token.RefreshToken)
 	} else {
@@ -80,24 +77,20 @@ func (a *App) OAuthCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("Access Token: %s", token.AccessToken)
 
-	// Check for an ID token (OpenID Connect flow).
 	if idToken, ok := token.Extra("id_token").(string); ok {
 		log.Printf("ID Token: %s", idToken)
 	} else {
 		log.Printf("No ID Token returned.")
 	}
 
-	// 1. Create a new request to the Microsoft Graph /me endpoint.
+	// Call Microsoft Graph /me endpoint
 	req, err := http.NewRequest("GET", "https://graph.microsoft.com/v1.0/me", nil)
 	if err != nil {
 		http.Error(w, "Failed to create Graph request: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	// 2. Add the access token to the request header.
 	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
 
-	// 3. Send the request.
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -106,20 +99,17 @@ func (a *App) OAuthCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	// 4. Check the response status.
 	if resp.StatusCode != http.StatusOK {
 		http.Error(w, fmt.Sprintf("Unexpected status code from Graph: %d", resp.StatusCode), http.StatusInternalServerError)
 		return
 	}
 
-	// 5. Decode the JSON response into a map.
 	var userData map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&userData); err != nil {
 		http.Error(w, "Failed to decode JSON: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// 6. Pretty‐print the JSON response and send it back to the user.
 	prettyJSON, err := json.MarshalIndent(userData, "", "  ")
 	if err != nil {
 		http.Error(w, "Failed to marshal JSON: "+err.Error(), http.StatusInternalServerError)

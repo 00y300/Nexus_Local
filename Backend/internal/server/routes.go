@@ -2,23 +2,8 @@ package server
 
 import (
 	"fmt"
-	"log"
 	"net/http"
-
-	"nexus.local/internal/auth"
 )
-
-// Server holds the dependencies for the HTTP server.
-type Server struct {
-	AuthApp *auth.App
-}
-
-// NewServer constructs a new Server instance using dependency injection.
-func NewServer(authApp *auth.App) *Server {
-	return &Server{
-		AuthApp: authApp,
-	}
-}
 
 // defaultHandler is a simple handler that shows a greeting message.
 func (s *Server) defaultHandler(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +18,6 @@ func corsMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
-		// Handle preflight OPTIONS requests.
 		if r.Method == http.MethodOptions {
 			return
 		}
@@ -42,25 +26,14 @@ func corsMiddleware(next http.Handler) http.Handler {
 }
 
 // routes sets up the URL routes and associates them with their handlers.
-func (s *Server) routes() *http.ServeMux {
+func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/hello/", s.defaultHandler)
 
-	// Dependency injection for OAuth routes.
+	// OAuth routes
 	mux.HandleFunc("/", s.AuthApp.Root)
 	mux.HandleFunc("/login", s.AuthApp.Login)
 	mux.HandleFunc("/redirect", s.AuthApp.OAuthCallback)
 
-	return mux
-}
-
-// Start starts the HTTP server on the given address.
-func (s *Server) Start(addr string) error {
-	mux := s.routes()
-
-	// Wrap all routes with the CORS middleware.
-	handlerWithCORS := corsMiddleware(mux)
-
-	log.Printf("Starting server on %s", addr)
-	return http.ListenAndServe(addr, handlerWithCORS)
+	return corsMiddleware(mux)
 }
