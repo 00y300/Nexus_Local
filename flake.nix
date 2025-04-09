@@ -39,6 +39,9 @@
             delve
             gopls
             go-outline
+            prettierd
+            lazysql
+
             tree
           ];
 

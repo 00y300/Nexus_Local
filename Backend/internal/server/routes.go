@@ -1,39 +1,54 @@
 package server
 
 import (
-	"fmt"
+	"encoding/json"
 	"net/http"
+
+	"nexus.local/internal/db"
 )
 
-// defaultHandler is a simple handler that shows a greeting message.
-func (s *Server) defaultHandler(w http.ResponseWriter, r *http.Request) {
-	msg := fmt.Sprintf("Hi there, I love %s!", r.URL.Path[len("/hello/"):])
-	w.Write([]byte(msg))
+type orderLine struct {
+	ItemID   int `json:"item_id"`
+	Quantity int `json:"quantity"`
+}
+type orderReq struct {
+	UserID int         `json:"user_id"`
+	Items  []orderLine `json:"items"`
 }
 
-// corsMiddleware sets the CORS headers for each request.
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-
-		if r.Method == http.MethodOptions {
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+func (s *Server) getItemsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	items, err := db.GetAllItems(s.DB)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(items)
 }
 
-// routes sets up the URL routes and associates them with their handlers.
-func (s *Server) routes() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/hello/", s.defaultHandler)
-
-	// OAuth routes
-	mux.HandleFunc("/", s.AuthApp.Root)
-	mux.HandleFunc("/login", s.AuthApp.Login)
-	mux.HandleFunc("/redirect", s.AuthApp.OAuthCallback)
-
-	return corsMiddleware(mux)
+func (s *Server) placeOrderHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req orderReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	orderMap := make(map[int]int)
+	for _, line := range req.Items {
+		orderMap[line.ItemID] = line.Quantity
+	}
+	orderID, err := db.PlaceOrder(s.DB, req.UserID, orderMap)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]int64{"order_id": orderID})
 }
