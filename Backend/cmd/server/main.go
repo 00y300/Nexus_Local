@@ -59,13 +59,6 @@ func main() {
 	defer sqlDB.Close()
 	log.Println("Connected to database.")
 
-	// (Optional) list items at startup
-	items, _ := db.GetAllItems(sqlDB)
-	for _, it := range items {
-		log.Printf("Item %d: %s ($%.2f) stock=%d",
-			it.ID, it.Name, it.Price, it.Stock)
-	}
-
 	// --- Wire up server ---
 	authApp := auth.NewApp(oauthCfg, tmpl)
 	srv := server.NewServer(authApp, sqlDB)
