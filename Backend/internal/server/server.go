@@ -35,7 +35,7 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/items", s.getItemsHandler)
 	mux.HandleFunc("/items/add", s.addItemHandler)
 	mux.HandleFunc("/items/update", s.updateStockHandler)
-	mux.HandleFunc("/orders", s.placeOrderHandler)
+	mux.HandleFunc("/orders", s.ordersHandler)
 
 	return mux
 }
