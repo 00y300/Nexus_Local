@@ -20,17 +20,30 @@ import (
 )
 
 func main() {
-	// ensure uploads dir exists
+	// 0) ensure uploads dir exists
 	if err := os.MkdirAll("uploads", 0755); err != nil {
 		log.Fatalf("could not create uploads dir: %v", err)
 	}
 
-	// 1) Load .env
+	// 1) Load .env (optional)
 	if err := godotenv.Load(); err != nil {
 		log.Println("Warning: .env file not found, relying on real ENV")
 	}
 
-	// 2) Azure AD settings...
+	// 2) Connect to the database
+	dbUser := os.Getenv("DB_USER")
+	dbPass := os.Getenv("DB_PASS")
+	dbHost := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
+	dbName := os.Getenv("DB_NAME")
+	sqlDB, err := db.Connect(dbUser, dbPass, dbHost, dbPort, dbName)
+	if err != nil {
+		log.Fatalf("DB connect error: %v", err)
+	}
+	defer sqlDB.Close()
+	log.Println("✅ Connected to database.")
+
+	// 3) Azure AD / OAuth2 settings
 	tenantID := os.Getenv("AZUREAD_TENANT_ID")
 	clientID := os.Getenv("AZUREAD_APP_ID")
 	clientSecret := os.Getenv("AZUREAD_VALUE")
@@ -38,7 +51,6 @@ func main() {
 		log.Fatal("Missing one of AZUREAD_TENANT_ID, AZUREAD_APP_ID, AZUREAD_VALUE")
 	}
 
-	// 3) OAuth2 config
 	oauthCfg := &oauth2.Config{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
@@ -56,30 +68,17 @@ func main() {
 	oauthCfg.Endpoint = provider.Endpoint()
 	verifier := provider.Verifier(&oidc.Config{ClientID: clientID})
 
-	// 5) Template
+	// 5) Parse login template
 	tmpl := template.Must(
 		template.New("index.html").
 			Funcs(template.FuncMap{"Join": strings.Join}).
 			ParseFiles("templates/index.html"),
 	)
 
-	// 6) AuthApp
-	authApp := auth.NewApp(oauthCfg, verifier, tmpl)
+	// 6) Build the AuthApp (now with a live *sql.DB)
+	authApp := auth.NewApp(oauthCfg, verifier, tmpl, sqlDB)
 
-	// 7) DB
-	dbUser := os.Getenv("DB_USER")
-	dbPass := os.Getenv("DB_PASS")
-	dbHost := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
-	dbName := os.Getenv("DB_NAME")
-	sqlDB, err := db.Connect(dbUser, dbPass, dbHost, dbPort, dbName)
-	if err != nil {
-		log.Fatalf("DB connect error: %v", err)
-	}
-	defer sqlDB.Close()
-	log.Println("✅ Connected to database.")
-
-	// 8) Server
+	// 7) Wire up and start your HTTP server
 	srv := server.NewServer(authApp, sqlDB)
 	log.Println("🚀 Starting server on :8080")
 	if err := srv.Start(":8080"); err != nil {
