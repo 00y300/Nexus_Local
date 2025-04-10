@@ -1,13 +1,13 @@
-// This will be the layout page
-// Essentially any components that will be render on every page
-import "../app/globals.css";
+// pages/_app.js
+import "@/app/globals.css";
+import { CartProvider } from "@/context/CartContext";
 import NavigationBar from "@/components/navigationBar";
 
 export default function MyApp({ Component, pageProps }) {
   return (
-    <>
-      <NavigationBar></NavigationBar>
-      <Component {...pageProps} /> {/* Render the specific page */}
-    </>
+    <CartProvider>
+      <NavigationBar />
+      <Component {...pageProps} />
+    </CartProvider>
   );
 }
