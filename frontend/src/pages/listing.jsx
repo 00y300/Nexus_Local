@@ -6,10 +6,11 @@ export default function ListingPage({ items }) {
   const { getTotalItems } = useCart();
 
   return (
-    <div className="space-y-6 p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Shop Our Products</h1>
-        <div>
+    <div className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      {/* header */}
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+        <h1 className="text-2xl font-bold sm:text-3xl">Shop Our Products</h1>
+        <div className="text-lg">
           Cart:{" "}
           <span className="font-semibold">
             {getTotalItems()} item{getTotalItems() !== 1 && "s"}
@@ -17,7 +18,8 @@ export default function ListingPage({ items }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 justify-items-center gap-6 sm:grid-cols-2 md:grid-cols-3">
+      {/* grid */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         {items.map((item) => (
           <ListingCard
             key={item.id}
@@ -26,7 +28,6 @@ export default function ListingPage({ items }) {
             description={item.description}
             price={item.price}
             stock={item.stock}
-            // uncomment when you have an image URL
             // imgsrc={item.image_url}
           />
         ))}
