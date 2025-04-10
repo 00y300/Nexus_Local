@@ -8,7 +8,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-// Item is a product in the shop.
 type Item struct {
 	ID          int     `json:"id"`
 	Name        string  `json:"name"`
@@ -17,14 +16,12 @@ type Item struct {
 	Stock       int     `json:"stock"`
 }
 
-// Order represents an order header.
 type Order struct {
 	ID        int64     `json:"id"`
-	UserID    int       `json:"user_id"`
+	UserID    string    `json:"user_id"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// OrderItem is a line‐item on an order.
 type OrderItem struct {
 	OrderID  int64 `json:"order_id"`
 	ItemID   int   `json:"item_id"`
@@ -47,7 +44,7 @@ func Connect(user, pass, host, port, name string) (*sql.DB, error) {
 	return db, nil
 }
 
-// GetAllItems returns every item in the `items` table.
+// GetAllItems returns every item in the items table.
 func GetAllItems(db *sql.DB) ([]Item, error) {
 	rows, err := db.Query(
 		"SELECT id, name, description, price, stock FROM items",
@@ -84,7 +81,7 @@ func GetItem(db *sql.DB, itemID int) (*Item, error) {
 	return &it, nil
 }
 
-// AddItem inserts a new product into the `items` table.
+// AddItem inserts a new product into the items table.
 // It returns the newly created item's ID.
 func AddItem(db *sql.DB, name, description string, price float64, stock int) (int64, error) {
 	res, err := db.Exec(
@@ -140,8 +137,8 @@ func DeleteItem(db *sql.DB, itemID int) error {
 }
 
 // PlaceOrder creates an order + order_items, and deducts stock.
-// orderItems maps itemID→quantity.
-func PlaceOrder(db *sql.DB, userID int, orderItems map[int]int) (int64, error) {
+// userID is now a string UUID.
+func PlaceOrder(db *sql.DB, userID string, orderItems map[int]int) (int64, error) {
 	tx, err := db.Begin()
 	if err != nil {
 		return 0, err

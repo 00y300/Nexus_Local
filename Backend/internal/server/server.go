@@ -1,3 +1,4 @@
+// internal/server/server.go
 package server
 
 import (
@@ -58,6 +59,26 @@ func (s *Server) routes() *http.ServeMux {
 	// Graph profile + DB upsert
 	mux.HandleFunc("/me", s.profileHandler)
 
+	// Logout endpoint — clears the auth cookies
+	mux.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
+		clear := func(name string) {
+			http.SetCookie(w, &http.Cookie{
+				Name:     name,
+				Value:    "",
+				Path:     "/",
+				HttpOnly: true,
+				// SameSite: http.SameSiteNoneMode,
+				// Secure:   false, // set to true in production
+				SameSite: http.SameSiteNoneMode,
+				Secure:   true, // ← must be true if SameSite=None
+				MaxAge:   -1,
+			})
+		}
+		clear("id_token")
+		clear("access_token")
+		w.WriteHeader(http.StatusNoContent)
+	})
+
 	return mux
 }
 
@@ -67,16 +88,22 @@ func (s *Server) Start(addr string) error {
 	return http.ListenAndServe(addr, handler)
 }
 
-// corsMiddleware sets permissive CORS headers.
+// corsMiddleware sets CORS headers and allows credentials.
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		// Only allow your front‑end origin
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		// Allow cookies to be sent/received
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
+		// Preflight requests
 		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
 			return
 		}
+
 		next.ServeHTTP(w, r)
 	})
 }

@@ -10,14 +10,15 @@ import (
 	"nexus.local/internal/db"
 )
 
+// orderLine is a single line‐item in the client’s payload.
 type orderLine struct {
 	ItemID   int `json:"item_id"`
 	Quantity int `json:"quantity"`
 }
 
+// orderReq no longer has a UserID field.
 type orderReq struct {
-	UserID int         `json:"user_id"`
-	Items  []orderLine `json:"items"`
+	Items []orderLine `json:"items"`
 }
 
 type stockUpdateReq struct {
@@ -102,10 +103,6 @@ func (s *Server) updateStockHandler(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, items, http.StatusOK)
 }
 
-// ----------------------------------------------------------------
-// Orders: all operations live under the single /orders path.
-// ----------------------------------------------------------------
-
 // ordersHandler dispatches GET, POST, DELETE on /orders
 func (s *Server) ordersHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -154,14 +151,46 @@ func (s *Server) getOrderHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /orders
+// Now extracts the user’s UUID from the id_token cookie
 func (s *Server) placeOrderHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 1) Decode the incoming JSON (no user_id field)
 	var req orderReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
 
-	// Accumulate quantities for duplicate itemIDs
+	// 2) Grab the raw ID token from the cookie
+	ck, err := r.Cookie("id_token")
+	if err != nil {
+		http.Error(w, "not authenticated", http.StatusUnauthorized)
+		return
+	}
+	raw := ck.Value
+
+	// 3) Verify it
+	idToken, err := s.AuthApp.Verifier.Verify(r.Context(), raw)
+	if err != nil {
+		http.Error(w, "invalid token", http.StatusUnauthorized)
+		return
+	}
+
+	// 4) Extract the "oid" claim (the Azure AD user UUID)
+	var claims struct {
+		OID string `json:"oid"`
+	}
+	if err := idToken.Claims(&claims); err != nil {
+		http.Error(w, "failed to parse token claims", http.StatusInternalServerError)
+		return
+	}
+	userID := claims.OID
+
+	// 5) Accumulate quantities
 	orderMap := make(map[int]int)
 	for _, line := range req.Items {
 		if line.Quantity <= 0 {
@@ -171,7 +200,7 @@ func (s *Server) placeOrderHandler(w http.ResponseWriter, r *http.Request) {
 		orderMap[line.ItemID] += line.Quantity
 	}
 
-	// Verify each item exists
+	// 6) Verify each item exists
 	for itemID := range orderMap {
 		if _, err := db.GetItem(s.DB, itemID); err != nil {
 			http.Error(w, fmt.Sprintf("item %d not found", itemID), http.StatusBadRequest)
@@ -179,7 +208,8 @@ func (s *Server) placeOrderHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	orderID, err := db.PlaceOrder(s.DB, req.UserID, orderMap)
+	// 7) Place the order under the extracted userID
+	orderID, err := db.PlaceOrder(s.DB, userID, orderMap)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

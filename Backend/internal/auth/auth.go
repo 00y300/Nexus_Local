@@ -150,25 +150,23 @@ func (a *App) OAuthCallback(w http.ResponseWriter, r *http.Request) {
 	at := token.AccessToken
 
 	// 6a) Set the ID token as an HTTP-only cookie
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     "id_token",
 		Value:    idt,
 		Path:     "/",
 		HttpOnly: true,
-		// Secure:   true, // enable in production
-		// SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteNoneMode,
+		Secure:   true,
 	})
-
-	// 6b) Set the Access token as an HTTP-only cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     "access_token",
 		Value:    at,
 		Path:     "/",
 		HttpOnly: true,
-		// Secure:   true, // enable in production
-		// SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteNoneMode,
+		Secure:   true,
 	})
-
 	// 7) Redirect back to your Next.js admin page
 	http.Redirect(w, r, "http://localhost:3000/admin/add-item", http.StatusFound)
 }

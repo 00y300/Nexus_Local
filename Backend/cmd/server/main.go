@@ -1,3 +1,4 @@
+// cmd/server/main.go
 package main
 
 import (
@@ -19,12 +20,17 @@ import (
 )
 
 func main() {
-	// 1) Load .env (if present)
+	// ensure uploads dir exists
+	if err := os.MkdirAll("uploads", 0755); err != nil {
+		log.Fatalf("could not create uploads dir: %v", err)
+	}
+
+	// 1) Load .env
 	if err := godotenv.Load(); err != nil {
 		log.Println("Warning: .env file not found, relying on real ENV")
 	}
 
-	// 2) Pull Azure AD settings
+	// 2) Azure AD settings...
 	tenantID := os.Getenv("AZUREAD_TENANT_ID")
 	clientID := os.Getenv("AZUREAD_APP_ID")
 	clientSecret := os.Getenv("AZUREAD_VALUE")
@@ -32,44 +38,35 @@ func main() {
 		log.Fatal("Missing one of AZUREAD_TENANT_ID, AZUREAD_APP_ID, AZUREAD_VALUE")
 	}
 
-	// 3) Build OAuth2 config (we’ll fill Endpoint from the OIDC provider)
+	// 3) OAuth2 config
 	oauthCfg := &oauth2.Config{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		RedirectURL:  "http://localhost:8080/redirect",
-		Scopes: []string{
-			"openid", // to get an ID token
-			"profile",
-			"email",
-			"offline_access",
-			"User.Read.All", // your Graph scope
-		},
+		Scopes:       []string{"openid", "profile", "email", "offline_access", "User.Read.All"},
 	}
 
-	// 4) Set up OIDC provider & verifier
+	// 4) OIDC provider & verifier
 	ctx := context.Background()
 	issuer := fmt.Sprintf("https://login.microsoftonline.com/%s/v2.0", tenantID)
 	provider, err := oidc.NewProvider(ctx, issuer)
 	if err != nil {
 		log.Fatalf("Failed to initialize OIDC provider: %v", err)
 	}
-	// fill in the AuthURL/TokenURL automatically
 	oauthCfg.Endpoint = provider.Endpoint()
-
-	// verifier will check signature, expiry, audience, issuer, etc.
 	verifier := provider.Verifier(&oidc.Config{ClientID: clientID})
 
-	// 5) Parse your index.html template (for the “/” login page)
+	// 5) Template
 	tmpl := template.Must(
 		template.New("index.html").
 			Funcs(template.FuncMap{"Join": strings.Join}).
 			ParseFiles("templates/index.html"),
 	)
 
-	// 6) Initialize your auth.App (with OAuth2 + OIDC + template)
+	// 6) AuthApp
 	authApp := auth.NewApp(oauthCfg, verifier, tmpl)
 
-	// 7) Connect to your database
+	// 7) DB
 	dbUser := os.Getenv("DB_USER")
 	dbPass := os.Getenv("DB_PASS")
 	dbHost := os.Getenv("DB_HOST")
@@ -82,7 +79,7 @@ func main() {
 	defer sqlDB.Close()
 	log.Println("✅ Connected to database.")
 
-	// 8) Wire up the HTTP server
+	// 8) Server
 	srv := server.NewServer(authApp, sqlDB)
 	log.Println("🚀 Starting server on :8080")
 	if err := srv.Start(":8080"); err != nil {
