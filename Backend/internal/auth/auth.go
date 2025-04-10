@@ -19,28 +19,14 @@ type PageData struct {
 	RedirectURL string
 }
 
-// App holds the OAuth config and template.
+// App holds the OAuth2 config, OIDC verifier, and HTML template.
 type App struct {
 	OAuthCfg *oauth2.Config
 	Verifier *oidc.IDTokenVerifier
 	Tmpl     *template.Template
 }
 
-// NewApp creates a new App.
-//
-//	func NewApp(oauthCfg *oauth2.Config, tmpl *template.Template) *App {
-//		return &App{OAuthCfg: oauthCfg, Tmpl: tmpl}
-//	}
-// func NewApp(ctx context.Context, oauthCfg *oauth2.Config, issuer, clientID string) (*App, error) {
-// 	provider, err := oidc.NewProvider(ctx, issuer)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	verifier := provider.Verifier(&oidc.Config{ClientID: clientID})
-// 	return &App{OAuthCfg: oauthCfg, Verifier: verifier}, nil
-// }
-
-// in internal/auth/auth.go
+// NewApp constructs a new App with OAuth2 config, verifier, and template.
 func NewApp(oauthCfg *oauth2.Config, verifier *oidc.IDTokenVerifier, tmpl *template.Template) *App {
 	return &App{
 		OAuthCfg: oauthCfg,
@@ -49,16 +35,29 @@ func NewApp(oauthCfg *oauth2.Config, verifier *oidc.IDTokenVerifier, tmpl *templ
 	}
 }
 
-// auth.go (continued)
-
 var (
+	// ErrNoAuthHeader is returned when no Authorization header is present.
 	ErrNoAuthHeader = errors.New("no Authorization header")
+	// ErrInvalidToken is returned when the token is missing or invalid.
 	ErrInvalidToken = errors.New("invalid token")
-	ErrForbidden    = errors.New("forbidden")
+	// ErrForbidden is returned when the user lacks the "admin" role.
+	ErrForbidden = errors.New("forbidden")
 )
 
+// logScopes extracts the "scope" field from the token response,
+// splits it on spaces, and logs the resulting slice.
+func logScopes(token *oauth2.Token) {
+	raw, ok := token.Extra("scope").(string)
+	if !ok || raw == "" {
+		log.Println("⚠️  no scopes returned in token response")
+		return
+	}
+	scopes := strings.Fields(raw)
+	log.Printf("✅ granted scopes: %v\n", scopes)
+}
+
 // AuthMiddleware ensures the request has a valid Bearer token
-// and that the “roles” claim includes “admin”.
+// and that the "roles" claim includes "admin".
 func (a *App) AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hdr := r.Header.Get("Authorization")
@@ -73,14 +72,14 @@ func (a *App) AuthMiddleware(next http.Handler) http.Handler {
 		}
 		rawIDToken := parts[1]
 
-		// Verify signature & claims (exp, aud, iss, ...)
+		// Verify signature & standard claims
 		idToken, err := a.Verifier.Verify(r.Context(), rawIDToken)
 		if err != nil {
 			http.Error(w, ErrInvalidToken.Error(), http.StatusUnauthorized)
 			return
 		}
 
-		// Pull out the roles claim
+		// Extract roles claim
 		var claims struct {
 			Roles []string `json:"roles"`
 		}
@@ -89,14 +88,12 @@ func (a *App) AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Check for “admin”
-		isAdmin := slices.Contains(claims.Roles, "admin")
-		if !isAdmin {
+		// Enforce admin role
+		if !slices.Contains(claims.Roles, "admin") {
 			http.Error(w, ErrForbidden.Error(), http.StatusForbidden)
 			return
 		}
 
-		// OK to proceed
 		next.ServeHTTP(w, r)
 	})
 }
@@ -111,7 +108,7 @@ func (a *App) Root(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Login redirects to Azure AD.
+// Login redirects the user to Azure AD for authentication.
 func (a *App) Login(w http.ResponseWriter, r *http.Request) {
 	state := "some-random-state"
 	url := a.OAuthCfg.AuthCodeURL(state, oauth2.AccessTypeOffline)
@@ -119,37 +116,59 @@ func (a *App) Login(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, url, http.StatusFound)
 }
 
-// OAuthCallback handles the code exchange and calls Graph /me.
-
+// OAuthCallback handles the code exchange, logs scopes, sets ID and access token cookies,
+// and redirects back to your Next.js admin page.
 func (a *App) OAuthCallback(w http.ResponseWriter, r *http.Request) {
+	// 1) Get the authorization code from the query params
 	code := r.URL.Query().Get("code")
 	if code == "" {
 		http.Error(w, "Missing code", http.StatusBadRequest)
 		return
 	}
+
+	// 2) Exchange the code for an OAuth2 token
 	token, err := a.OAuthCfg.Exchange(context.Background(), code)
 	if err != nil {
 		http.Error(w, "Token exchange failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Extract the ID token string
-	idt, _ := token.Extra("id_token").(string)
-	if idt == "" {
-		http.Error(w, "No id_token in response", http.StatusInternalServerError)
-		return
+	// 3) Log the granted scopes for debugging
+	logScopes(token)
+
+	// 4) (Optional) Log raw tokens for debugging
+	log.Printf("Access Token: %s", token.AccessToken)
+	if rt := token.RefreshToken; rt != "" {
+		log.Printf("Refresh Token: %s", rt)
+	}
+	if idtRaw, ok := token.Extra("id_token").(string); ok {
+		log.Printf("ID Token: %s", idtRaw)
 	}
 
-	// Set it as a secure, HTTP-only cookie
+	// 5) Extract the ID token and Access token
+	idt, _ := token.Extra("id_token").(string)
+	at := token.AccessToken
+
+	// 6a) Set the ID token as an HTTP-only cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     "id_token",
 		Value:    idt,
 		Path:     "/",
 		HttpOnly: true,
-		// Secure: true, // in prod
+		// Secure:   true, // enable in production
 		// SameSite: http.SameSiteLaxMode,
 	})
 
-	// Redirect back to your Next.js admin page (or home)
+	// 6b) Set the Access token as an HTTP-only cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access_token",
+		Value:    at,
+		Path:     "/",
+		HttpOnly: true,
+		// Secure:   true, // enable in production
+		// SameSite: http.SameSiteLaxMode,
+	})
+
+	// 7) Redirect back to your Next.js admin page
 	http.Redirect(w, r, "http://localhost:3000/admin/add-item", http.StatusFound)
 }
