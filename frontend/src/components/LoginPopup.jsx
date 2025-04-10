@@ -43,66 +43,14 @@ const LoginPopup = ({ onClose }) => {
             <div className="mt-7 flex flex-col gap-2">
               <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded border border-slate-300 bg-white p-2 text-sm font-medium text-black focus:ring-2 focus:ring-[#333] focus:ring-offset-1">
                 <Image
-                  src="https://www.svgrepo.com/show/448234/linkedin.svg"
-                  alt="LinkedIn"
+                  src="/Microsoft_logo.svg"
+                  alt="Micorsoft"
                   className="h-[18px] w-[18px]"
                   width={500}
                   height={500}
                 />
-                Continue with LinkedIn
+                Continue with Microsoft
               </button>
-            </div>
-
-            <div className="flex w-full items-center gap-2 py-6 text-sm text-slate-600">
-              <div className="h-px w-full bg-slate-200"></div>
-              OR
-              <div className="h-px w-full bg-slate-200"></div>
-            </div>
-
-            <form className="w-full">
-              <label htmlFor="email" className="sr-only">
-                Email address
-              </label>
-              <input
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
-                placeholder="Email Address"
-              />
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
-                placeholder="Password"
-              />
-              <p className="mt-2 mb-3 text-sm text-gray-500">
-                <a
-                  href="/forgot-password"
-                  className="text-blue-800 hover:text-blue-600"
-                >
-                  Reset your password?
-                </a>
-              </p>
-              <button
-                type="submit"
-                className="inline-flex w-full items-center justify-center rounded-lg bg-black p-2 py-3 text-sm font-medium text-white focus:ring-2 focus:ring-black focus:ring-offset-1"
-              >
-                Continue
-              </button>
-            </form>
-
-            <div className="mt-6 text-center text-sm text-slate-600">
-              Don't have an account?{" "}
-              <a href="/signup" className="font-medium text-[#4285f4]">
-                Sign up
-              </a>
             </div>
           </div>
         </div>

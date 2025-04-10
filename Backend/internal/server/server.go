@@ -2,7 +2,6 @@ package server
 
 import (
 	"database/sql"
-	"log"
 	"net/http"
 
 	"nexus.local/internal/auth"
@@ -26,15 +25,25 @@ func NewServer(authApp *auth.App, db *sql.DB) *Server {
 func (s *Server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 
-	// OAuth endpoints
+	// Public OAuth endpoints
 	mux.HandleFunc("/", s.AuthApp.Root)
 	mux.HandleFunc("/login", s.AuthApp.Login)
 	mux.HandleFunc("/redirect", s.AuthApp.OAuthCallback)
 
-	// CRUD endpoints
+	// Public: list items
 	mux.HandleFunc("/items", s.getItemsHandler)
-	mux.HandleFunc("/items/add", s.addItemHandler)
-	mux.HandleFunc("/items/update", s.updateStockHandler)
+
+	// Admin-only: add & update stock
+	mux.Handle(
+		"/items/add",
+		s.AuthApp.AuthMiddleware(http.HandlerFunc(s.addItemHandler)),
+	)
+	mux.Handle(
+		"/items/update",
+		s.AuthApp.AuthMiddleware(http.HandlerFunc(s.updateStockHandler)),
+	)
+
+	// Public or user-scoped orders endpoint
 	mux.HandleFunc("/orders", s.ordersHandler)
 
 	return mux
@@ -43,7 +52,6 @@ func (s *Server) routes() *http.ServeMux {
 // Start runs the HTTP server with CORS enabled.
 func (s *Server) Start(addr string) error {
 	handler := corsMiddleware(s.routes())
-	log.Printf("Starting server on %s", addr)
 	return http.ListenAndServe(addr, handler)
 }
 
@@ -52,7 +60,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		if r.Method == http.MethodOptions {
 			return
