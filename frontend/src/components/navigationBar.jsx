@@ -2,7 +2,6 @@
 // Utilizes the routes form NEXTJS to link other webpages
 // See: https://nextjs.org/docs/app/building-your-application/routing/linking-and-navigating#link-component
 
-// components/NavigationBar.jsx
 import Link from "next/link";
 import { useState } from "react";
 import LoginPopup from "./LoginPopup";
@@ -14,18 +13,17 @@ const NavigationBar = () => {
   const { getTotalItems } = useCart();
   const count = getTotalItems();
 
-  const handleProfileClick = () => setShowPopup(true);
-  const handleClosePopup = () => setShowPopup(false);
-
   return (
     <nav className="flex h-16 items-center justify-between bg-gray-100 px-4">
-      {/* Navigation links */}
       <ul className="flex space-x-4">
         <li className="border-2 p-2">
           <Link href="/">Home</Link>
         </li>
         <li className="border-2 p-2">
           <Link href="/listing">Listing</Link>
+        </li>
+        <li className="border-2 p-2">
+          <Link href="/orders">Orders</Link>
         </li>
         <li className="relative border-2 p-2">
           <Link href="/cart">Cart</Link>
@@ -36,10 +34,8 @@ const NavigationBar = () => {
           )}
         </li>
       </ul>
-
-      {/* Profile icon */}
       <div className="relative">
-        <button onClick={handleProfileClick}>
+        <button onClick={() => setShowPopup(true)}>
           <Image
             width={32}
             height={32}
@@ -48,7 +44,7 @@ const NavigationBar = () => {
             className="rounded-full"
           />
         </button>
-        {showPopup && <LoginPopup onClose={handleClosePopup} />}
+        {showPopup && <LoginPopup onClose={() => setShowPopup(false)} />}
       </div>
     </nav>
   );

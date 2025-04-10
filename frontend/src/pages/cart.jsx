@@ -1,7 +1,12 @@
 // pages/cart.jsx
+//
+
+// pages/cart.jsx
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/router";
 import { useCart } from "@/context/CartContext";
+import { useApi } from "@/context/ApiContext";
 
 export default function CartPage() {
   const {
@@ -12,14 +17,29 @@ export default function CartPage() {
     clearCart,
     getTotalPrice,
   } = useCart();
+  const { postOrderApi } = useApi();
+  const router = useRouter();
 
-  // Empty state
+  const handleCheckout = async () => {
+    const payload = {
+      user_id: 1, // replace with real user ID
+      items: cartItems.map(({ id, quantity }) => ({
+        item_id: id,
+        quantity,
+      })),
+    };
+    const data = await postOrderApi(payload);
+    clearCart();
+    router.push(`/orders/${data.order_id || data.id}`);
+  };
+
+  // Empty‑cart state
   if (cartItems.length === 0) {
     return (
       <div className="p-8 text-center">
         <h1 className="mb-4 text-2xl font-bold">Your Cart is Empty</h1>
-        <Link href="/listing">
-          <a className="text-blue-600 hover:underline">Continue Shopping</a>
+        <Link href="/listing" className="text-blue-600 hover:underline">
+          Continue Shopping
         </Link>
       </div>
     );
@@ -36,15 +56,13 @@ export default function CartPage() {
             className="flex items-center justify-between border-b pb-4"
           >
             <div className="flex items-center space-x-4">
-              <div className="relative h-20 w-20">
-                <Image
-                  src={item.imgsrc}
-                  alt={item.name}
-                  layout="fill"
-                  objectFit="cover"
-                  className="rounded-lg"
-                />
-              </div>
+              <Image
+                src={item.imgsrc}
+                alt={item.name}
+                width={80}
+                height={80}
+                className="rounded-lg object-cover"
+              />
               <div>
                 <h2 className="text-lg font-semibold">{item.name}</h2>
                 <p className="text-sm text-gray-600">
@@ -86,6 +104,13 @@ export default function CartPage() {
           Total: ${getTotalPrice().toFixed(2)}
         </div>
       </div>
+
+      <button
+        onClick={handleCheckout}
+        className="mt-4 rounded bg-green-600 px-4 py-2 text-white"
+      >
+        Checkout
+      </button>
     </div>
   );
 }
