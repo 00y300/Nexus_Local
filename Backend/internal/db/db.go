@@ -292,3 +292,25 @@ func UpdateItemImageURL(db *sql.DB, itemID int, imageURL string) error {
 	)
 	return err
 }
+
+// GetOrdersByUser returns every order belonging to userID.
+func GetOrdersByUser(db *sql.DB, userID string) ([]Order, error) {
+	rows, err := db.Query(
+		"SELECT id, user_id, created_at FROM orders WHERE user_id = ?",
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []Order
+	for rows.Next() {
+		var o Order
+		if err := rows.Scan(&o.ID, &o.UserID, &o.CreatedAt); err != nil {
+			return nil, err
+		}
+		orders = append(orders, o)
+	}
+	return orders, nil
+}

@@ -1,6 +1,8 @@
+// internal/server/routes.go
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -29,13 +31,6 @@ type stockUpdateReq struct {
 	Stock  int `json:"stock"`
 }
 
-type addItemReq struct {
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	Price       float64 `json:"price"`
-	Stock       int     `json:"stock"`
-}
-
 // GET /items
 func (s *Server) getItemsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -50,46 +45,12 @@ func (s *Server) getItemsHandler(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, items, http.StatusOK)
 }
 
-// POST /items/add
-/* func (s *Server) addItemHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	var req addItemReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
-		return
-	}
-
-	// Prevent duplicate by name (case‐insensitive)
-	all, err := db.GetAllItems(s.DB)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	for _, it := range all {
-		if strings.EqualFold(it.Name, req.Name) {
-			http.Error(w, "item already exists", http.StatusConflict)
-			return
-		}
-	}
-
-	id, err := db.AddItem(s.DB, req.Name, req.Description, req.Price, req.Stock)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	jsonResponse(w, map[string]int64{"item_id": id}, http.StatusCreated)
-} */
-
-// in internal/server/routes.go, replace addItemHandler:
+// POST /items/add (with image upload)
 func (s *Server) addItemHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	// 1) parse a multipart form (max 10 MB):
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		http.Error(w, "could not parse form", http.StatusBadRequest)
 		return
@@ -99,36 +60,31 @@ func (s *Server) addItemHandler(w http.ResponseWriter, r *http.Request) {
 	price, _ := strconv.ParseFloat(r.FormValue("price"), 64)
 	stock, _ := strconv.Atoi(r.FormValue("stock"))
 
-	// Prevent duplicate by name (same as before)...
-
-	// 2) insert item row without image_url first
-	newID, err := db.AddItemWithImageURL(
-		s.DB, name, desc, price, stock, "",
-	)
+	// 1) insert without image_url
+	newID, err := db.AddItemWithImageURL(s.DB, name, desc, price, stock, "")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// 3) handle the file
+	// 2) save uploaded image if present
 	file, header, err := r.FormFile("image")
 	if err == nil {
 		defer file.Close()
-		// derive extension
 		ext := filepath.Ext(header.Filename)
 		filename := fmt.Sprintf("%d%s", newID, ext)
-		out, err := os.Create(filepath.Join("uploads", filename))
+		dstPath := filepath.Join("uploads", filename)
+		out, err := os.Create(dstPath)
 		if err == nil {
 			defer out.Close()
 			io.Copy(out, file)
-			// 4) update item with image_url
 			imageURL := "/uploads/" + filename
 			if err := db.UpdateItemImageURL(s.DB, int(newID), imageURL); err != nil {
 				log.Println("failed to update image_url:", err)
 			}
 		}
 	}
-	// 5) return created ID
+
 	jsonResponse(w, map[string]int64{"item_id": newID}, http.StatusCreated)
 }
 
@@ -162,7 +118,7 @@ func (s *Server) ordersHandler(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("order_id") != "" {
 			s.getOrderHandler(w, r)
 		} else {
-			s.getOrdersHandler(w)
+			s.getOrdersHandler(w, r)
 		}
 	case http.MethodPost:
 		s.placeOrderHandler(w, r)
@@ -173,9 +129,33 @@ func (s *Server) ordersHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GET /orders
-func (s *Server) getOrdersHandler(w http.ResponseWriter) {
-	orders, err := db.GetAllOrders(s.DB)
+// extractUserID verifies the id_token cookie and returns the Azure OID.
+func (s *Server) extractUserID(r *http.Request) (string, error) {
+	ck, err := r.Cookie("id_token")
+	if err != nil {
+		return "", err
+	}
+	idToken, err := s.AuthApp.Verifier.Verify(context.Background(), ck.Value)
+	if err != nil {
+		return "", err
+	}
+	var claims struct {
+		OID string `json:"oid"`
+	}
+	if err := idToken.Claims(&claims); err != nil {
+		return "", err
+	}
+	return claims.OID, nil
+}
+
+// GET /orders — only the logged‑in user’s orders
+func (s *Server) getOrdersHandler(w http.ResponseWriter, r *http.Request) {
+	userID, err := s.extractUserID(r)
+	if err != nil {
+		http.Error(w, "not authenticated", http.StatusUnauthorized)
+		return
+	}
+	orders, err := db.GetOrdersByUser(s.DB, userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -183,7 +163,7 @@ func (s *Server) getOrdersHandler(w http.ResponseWriter) {
 	jsonResponse(w, orders, http.StatusOK)
 }
 
-// GET /orders?order_id=123
+// GET /orders?order_id=123 — only if it belongs to the user
 func (s *Server) getOrderHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("order_id")
 	orderID, err := strconv.ParseInt(idStr, 10, 64)
@@ -196,71 +176,51 @@ func (s *Server) getOrderHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	userID, err := s.extractUserID(r)
+	if err != nil {
+		http.Error(w, "not authenticated", http.StatusUnauthorized)
+		return
+	}
+	if order.UserID != userID {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
 	jsonResponse(w, map[string]any{
 		"order":       order,
 		"order_items": lines,
 	}, http.StatusOK)
 }
 
-// POST /orders
-// Now extracts the user’s UUID from the id_token cookie
+// POST /orders — place under the extracted userID
 func (s *Server) placeOrderHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
-	// 1) Decode the incoming JSON (no user_id field)
 	var req orderReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
-
-	// 2) Grab the raw ID token from the cookie
-	ck, err := r.Cookie("id_token")
+	userID, err := s.extractUserID(r)
 	if err != nil {
 		http.Error(w, "not authenticated", http.StatusUnauthorized)
 		return
 	}
-	raw := ck.Value
-
-	// 3) Verify it
-	idToken, err := s.AuthApp.Verifier.Verify(r.Context(), raw)
-	if err != nil {
-		http.Error(w, "invalid token", http.StatusUnauthorized)
-		return
-	}
-
-	// 4) Extract the "oid" claim (the Azure AD user UUID)
-	var claims struct {
-		OID string `json:"oid"`
-	}
-	if err := idToken.Claims(&claims); err != nil {
-		http.Error(w, "failed to parse token claims", http.StatusInternalServerError)
-		return
-	}
-	userID := claims.OID
-
-	// 5) Accumulate quantities
 	orderMap := make(map[int]int)
 	for _, line := range req.Items {
 		if line.Quantity <= 0 {
-			http.Error(w, "quantity must be > 0", http.StatusBadRequest)
+			http.Error(w, "quantity must be > 0", http.StatusBadRequest)
 			return
 		}
 		orderMap[line.ItemID] += line.Quantity
 	}
-
-	// 6) Verify each item exists
 	for itemID := range orderMap {
 		if _, err := db.GetItem(s.DB, itemID); err != nil {
 			http.Error(w, fmt.Sprintf("item %d not found", itemID), http.StatusBadRequest)
 			return
 		}
 	}
-
-	// 7) Place the order under the extracted userID
 	orderID, err := db.PlaceOrder(s.DB, userID, orderMap)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -269,12 +229,26 @@ func (s *Server) placeOrderHandler(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, map[string]int64{"order_id": orderID}, http.StatusCreated)
 }
 
-// DELETE /orders?order_id=123
+// DELETE /orders?order_id=123 — only if it belongs to the user
 func (s *Server) deleteOrderHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("order_id")
 	orderID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		http.Error(w, "invalid order_id", http.StatusBadRequest)
+		return
+	}
+	userID, err := s.extractUserID(r)
+	if err != nil {
+		http.Error(w, "not authenticated", http.StatusUnauthorized)
+		return
+	}
+	order, _, err := db.GetOrderByID(s.DB, orderID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if order.UserID != userID {
+		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 	if err := db.DeleteOrder(s.DB, orderID); err != nil {
@@ -284,7 +258,7 @@ func (s *Server) deleteOrderHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// helper to write JSON + status
+// jsonResponse is a helper for writing JSON + status code.
 func jsonResponse(w http.ResponseWriter, data interface{}, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
