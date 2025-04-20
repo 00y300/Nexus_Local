@@ -1,3 +1,4 @@
+// internal/db/db.go
 package db
 
 import (
@@ -14,6 +15,7 @@ type Item struct {
 	Description string  `json:"description"`
 	Price       float64 `json:"price"`
 	Stock       int     `json:"stock"`
+	ImageURL    string  `json:"image_url,omitempty"`
 }
 
 type Order struct {
@@ -44,10 +46,10 @@ func Connect(user, pass, host, port, name string) (*sql.DB, error) {
 	return db, nil
 }
 
-// GetAllItems returns every item in the items table.
+// GetAllItems returns every item in the items table, including image_url.
 func GetAllItems(db *sql.DB) ([]Item, error) {
 	rows, err := db.Query(
-		"SELECT id, name, description, price, stock FROM items",
+		"SELECT id, name, description, price, stock, image_url FROM items",
 	)
 	if err != nil {
 		return nil, err
@@ -57,26 +59,48 @@ func GetAllItems(db *sql.DB) ([]Item, error) {
 	var items []Item
 	for rows.Next() {
 		var it Item
-		if err := rows.Scan(&it.ID, &it.Name, &it.Description, &it.Price, &it.Stock); err != nil {
+		var img sql.NullString
+		if err := rows.Scan(
+			&it.ID,
+			&it.Name,
+			&it.Description,
+			&it.Price,
+			&it.Stock,
+			&img,
+		); err != nil {
 			return nil, err
+		}
+		if img.Valid {
+			it.ImageURL = img.String
 		}
 		items = append(items, it)
 	}
 	return items, nil
 }
 
-// GetItem fetches a single item by its ID.
+// GetItem fetches a single item by its ID, including image_url.
 func GetItem(db *sql.DB, itemID int) (*Item, error) {
 	var it Item
+	var img sql.NullString
 	err := db.QueryRow(
-		"SELECT id, name, description, price, stock FROM items WHERE id = ?",
+		"SELECT id, name, description, price, stock, image_url FROM items WHERE id = ?",
 		itemID,
-	).Scan(&it.ID, &it.Name, &it.Description, &it.Price, &it.Stock)
+	).Scan(
+		&it.ID,
+		&it.Name,
+		&it.Description,
+		&it.Price,
+		&it.Stock,
+		&img,
+	)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("item %d not found", itemID)
 	}
 	if err != nil {
 		return nil, err
+	}
+	if img.Valid {
+		it.ImageURL = img.String
 	}
 	return &it, nil
 }
@@ -137,7 +161,6 @@ func DeleteItem(db *sql.DB, itemID int) error {
 }
 
 // PlaceOrder creates an order + order_items, and deducts stock.
-// userID is now a string UUID.
 func PlaceOrder(db *sql.DB, userID string, orderItems map[int]int) (int64, error) {
 	tx, err := db.Begin()
 	if err != nil {
@@ -205,7 +228,6 @@ func GetAllOrders(db *sql.DB) ([]Order, error) {
 
 // GetOrderByID fetches one order and its line‐items.
 func GetOrderByID(db *sql.DB, orderID int64) (*Order, []OrderItem, error) {
-	// fetch order header
 	var o Order
 	err := db.QueryRow(
 		"SELECT id, user_id, created_at FROM orders WHERE id = ?",
@@ -218,7 +240,6 @@ func GetOrderByID(db *sql.DB, orderID int64) (*Order, []OrderItem, error) {
 		return nil, nil, err
 	}
 
-	// fetch line‐items
 	rows, err := db.Query(
 		"SELECT order_id, item_id, quantity FROM order_items WHERE order_id = ?",
 		orderID,
@@ -236,7 +257,6 @@ func GetOrderByID(db *sql.DB, orderID int64) (*Order, []OrderItem, error) {
 		}
 		lines = append(lines, li)
 	}
-
 	return &o, lines, nil
 }
 
@@ -250,4 +270,25 @@ func DeleteOrder(db *sql.DB, orderID int64) error {
 		return fmt.Errorf("no order with id %d", orderID)
 	}
 	return nil
+}
+
+// AddItemWithImageURL inserts a new item and allows setting image_url.
+func AddItemWithImageURL(db *sql.DB, name, desc string, price float64, stock int, imageURL string) (int64, error) {
+	res, err := db.Exec(
+		"INSERT INTO items (name, description, price, stock, image_url) VALUES (?, ?, ?, ?, ?)",
+		name, desc, price, stock, imageURL,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// UpdateItemImageURL updates only the image_url column for an item.
+func UpdateItemImageURL(db *sql.DB, itemID int, imageURL string) error {
+	_, err := db.Exec(
+		"UPDATE items SET image_url = ? WHERE id = ?",
+		imageURL, itemID,
+	)
+	return err
 }

@@ -9,23 +9,32 @@ export default function AddItemPage() {
     price: "",
     stock: "",
   });
+  const [file, setFile] = useState(null);
   const [message, setMessage] = useState("");
 
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
 
+  const handleFileChange = (e) => {
+    if (e.target.files.length > 0) {
+      setFile(e.target.files[0]);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const data = new FormData();
+    data.append("name", form.name);
+    data.append("description", form.description);
+    data.append("price", form.price);
+    data.append("stock", form.stock);
+    if (file) data.append("image", file); // key matches Go handler’s FormFile("image")
+
     try {
-      const payload = {
-        name: form.name,
-        description: form.description,
-        price: parseFloat(form.price),
-        stock: parseInt(form.stock, 10),
-      };
-      const data = await addItemApi(payload);
-      setMessage(`✅ Added item with ID ${data.id}`);
+      const json = await addItemApi(data);
+      setMessage(`✅ Added item #${json.item_id}`);
       setForm({ name: "", description: "", price: "", stock: "" });
+      setFile(null);
     } catch (err) {
       setMessage(`❌ ${err.message}`);
     }
@@ -70,14 +79,21 @@ export default function AddItemPage() {
           required
           className="w-full rounded border p-2"
         />
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          className="w-full rounded border p-2"
+        />
+
         <button
           type="submit"
-          className="rounded bg-blue-600 px-4 py-2 text-white"
+          className="w-full rounded bg-blue-600 px-4 py-2 text-white"
         >
-          Add Item
+          Add Item with Image
         </button>
       </form>
-      {message && <p>{message}</p>}
+      {message && <p className="mt-2">{message}</p>}
     </div>
   );
 }

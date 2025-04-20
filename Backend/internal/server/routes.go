@@ -3,9 +3,12 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
-	"strings"
 
 	"nexus.local/internal/db"
 )
@@ -48,7 +51,7 @@ func (s *Server) getItemsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /items/add
-func (s *Server) addItemHandler(w http.ResponseWriter, r *http.Request) {
+/* func (s *Server) addItemHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -78,6 +81,55 @@ func (s *Server) addItemHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonResponse(w, map[string]int64{"item_id": id}, http.StatusCreated)
+} */
+
+// in internal/server/routes.go, replace addItemHandler:
+func (s *Server) addItemHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	// 1) parse a multipart form (max 10 MB):
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		http.Error(w, "could not parse form", http.StatusBadRequest)
+		return
+	}
+	name := r.FormValue("name")
+	desc := r.FormValue("description")
+	price, _ := strconv.ParseFloat(r.FormValue("price"), 64)
+	stock, _ := strconv.Atoi(r.FormValue("stock"))
+
+	// Prevent duplicate by name (same as before)...
+
+	// 2) insert item row without image_url first
+	newID, err := db.AddItemWithImageURL(
+		s.DB, name, desc, price, stock, "",
+	)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 3) handle the file
+	file, header, err := r.FormFile("image")
+	if err == nil {
+		defer file.Close()
+		// derive extension
+		ext := filepath.Ext(header.Filename)
+		filename := fmt.Sprintf("%d%s", newID, ext)
+		out, err := os.Create(filepath.Join("uploads", filename))
+		if err == nil {
+			defer out.Close()
+			io.Copy(out, file)
+			// 4) update item with image_url
+			imageURL := "/uploads/" + filename
+			if err := db.UpdateItemImageURL(s.DB, int(newID), imageURL); err != nil {
+				log.Println("failed to update image_url:", err)
+			}
+		}
+	}
+	// 5) return created ID
+	jsonResponse(w, map[string]int64{"item_id": newID}, http.StatusCreated)
 }
 
 // POST /items/update

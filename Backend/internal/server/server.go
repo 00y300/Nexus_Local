@@ -79,6 +79,12 @@ func (s *Server) routes() *http.ServeMux {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
+	// serve uploads at /uploads/*
+	mux.Handle("/uploads/",
+		http.StripPrefix("/uploads/",
+			http.FileServer(http.Dir("uploads"))),
+	)
+
 	return mux
 }
 
