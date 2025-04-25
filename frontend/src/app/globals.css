@@ -1,2 +1,14 @@
 /* The way to setup the the tailwindcss for the entire project. */
 @import "tailwindcss";
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+html {
+  font-family: "Inter", sans-serif;
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #f9fafb;
+  color: #1f2937; /* slate-800 */
+}

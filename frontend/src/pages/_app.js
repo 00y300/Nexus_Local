@@ -11,6 +11,10 @@ export default function MyApp({ Component, pageProps }) {
         <NavigationBar />
         <Component {...pageProps} />
       </ApiProvider>
+
+      <footer className="mt-16 border-t py-6 text-center text-sm text-gray-500">
+        © {new Date().getFullYear()} Nexus Local. All rights reserved.
+      </footer>
     </CartProvider>
   );
 }
